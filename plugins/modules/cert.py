@@ -81,7 +81,6 @@ class pfSenseCERT(object):
         self.module = module
         self.pfsense = PFSenseModule(module)
         self.certs = self.pfsense.get_elements('cert')
-        # self.crls = self.pfsense.get_elements('crl')
 
     def _find_cert(self, name):
         found = None
@@ -93,15 +92,7 @@ class pfSenseCERT(object):
                 break
         return (found, i)
 
-    # def _find_crl(self, certref):
-    #     found = None
-    #     i = 0
-    #     for crl in self.crls:
-    #         i = self.pfsense.get_index(crl)
-    #         if crl.find('certref').text == certref:
-    #             found = crl
-    #             break
-    #     return (found, i)
+
 
     def validate_cert(self, cert):
         lines = cert.splitlines()
@@ -125,25 +116,14 @@ class pfSenseCERT(object):
         else:
             self.module.fail_json(msg='Could not recognize private key format: %s' % (prv))
 
-    # def validate_crl(self, crl):
-    #     lines = crl.splitlines()
-    #     if lines[0] == '-----BEGIN X509 CRL-----' and lines[-1] == '-----END X509 CRL-----':
-    #         return base64.b64encode(crl)
-    #     elif re.match('LS0tLS1CRUdJTiBYNTA5IENSTC0tLS0t', crl):
-    #         return crl
-    #     else:
-    #         self.module.fail_json(msg='Could not recognize CRL format: %s' % (crl))
+
 
     def add(self, cert):
         cert_elt, cert_idx = self._find_cert(cert['descr'])
         changed = False
-        # crl = {}
         diff = {}
         stdout = None
         stderr = None
-        # if 'crl' in cert:
-        #     crl['method'] = 'existing'
-        #     crl['text'] = cert.pop('crl')
         if cert_elt is None:
             diff['before'] = ''
             changed = True
@@ -151,30 +131,9 @@ class pfSenseCERT(object):
             cert['refid'] = self.pfsense.uniqid()
             self.pfsense.copy_dict_to_element(cert, cert_elt)
             self.pfsense.root.append(cert_elt)
-            # if 'text' in crl:
-            #     crl_elt = self.pfsense.new_element('crl')
-            #     crl['refid'] = self.pfsense.uniqid()
-            #     crl['descr'] = cert['descr'] + ' CRL'
-            #     crl['certref'] = cert['refid']
-            #     self.pfsense.copy_dict_to_element(crl, crl_elt)
-            #     self.pfsense.root.append(crl_elt)
             descr = 'ansible pfsensible.core.cert added %s' % (cert['descr'])
         else:
             diff['before'] = self.pfsense.element_to_dict(cert_elt)
-            # if 'text' in crl:
-            #     crl_elt, crl_index = self._find_crl(cert_elt.find('refid').text)
-            #     if crl_elt is None:
-            #         changed = True
-            #         crl_elt = self.pfsense.new_element('crl')
-            #         crl['refid'] = self.pfsense.uniqid()
-            #         crl['descr'] = cert['descr'] + ' CRL'
-            #         crl['certref'] = cert_elt.find('refid').text
-            #         self.pfsense.copy_dict_to_element(crl, crl_elt)
-            #         # Add after the existing cert entry
-            #         self.pfsense.root.insert(cert_idx + 1, crl_elt)
-            #     else:
-            #         diff['before']['crl'] = crl_elt.find('text').text
-            #         changed = self.pfsense.copy_dict_to_element(crl, crl_elt)
             if self.pfsense.copy_dict_to_element(cert, cert_elt):
                 changed = True
             descr = 'ansible pfsensible.core.cert updated "%s"' % (cert['descr'])
@@ -190,16 +149,7 @@ class pfSenseCERT(object):
                 print_r($cert);
                 print_r($config['cert']);
                 write_config();""".format(refid=cert_elt.find('refid').text, cert=base64.b64decode(cert_elt.find('crt').text), priv=base64.b64decode(cert_elt.find('prv').text)))
-            # if 'text' in crl:
-            #     self.pfsense.phpshell("""
-            #         require_once("openvpn.inc");
-            #         openvpn_refresh_crls();
-            #         require_once("vpn.inc");
-            #         vpn_ipsec_configure();""")
-
         diff['after'] = self.pfsense.element_to_dict(cert_elt)
-        # if 'text' in crl:
-        #     diff['after']['crl'] = crl['text']
         self.module.exit_json(changed=changed, diff=diff, stdout=stdout, stderr=stderr)
 
     def remove(self, cert):
@@ -210,11 +160,7 @@ class pfSenseCERT(object):
         if cert_elt is not None:
             changed = True
             diff['before'] = self.pfsense.element_to_dict(cert_elt)
-            # crl_elt, dummy = self._find_crl(cert_elt.find('refid').text)
             self.certs.remove(cert_elt)
-            # if crl_elt is not None:
-            #     diff['before']['crl'] = crl_elt.find('text').text
-            #     self.crls.remove(crl_elt)
         else:
             diff['before'] = {}
         if changed and not self.module.check_mode:
@@ -232,7 +178,6 @@ def main():
             },
             'certificate': {'required': False, 'type': 'str'},
             'prv': {'required': False, 'type': 'str'},
-            # 'crl': {'required': False, 'default': None, 'type': 'str'},
         },
         required_if=[
             ["state", "present", ["certificate","prv"]],
@@ -249,8 +194,6 @@ def main():
     elif state == 'present':
         cert['crt'] = pfcert.validate_cert(module.params['certificate'])
         cert['prv'] = pfcert.validate_prv(module.params['prv'])
-        # if module.params['crl'] is not None:
-        #     cert['crl'] = pfcert.validate_crl(module.params['crl'])
         pfcert.add(cert)
 
 
