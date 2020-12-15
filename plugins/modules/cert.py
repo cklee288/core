@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# Copyright: (c) 2018-2019, Orion Poplawski <orion@nwra.com>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import absolute_import, division, print_function
@@ -15,10 +14,10 @@ DOCUMENTATION = """
 ---
 module: pfsensible.core.cert
 version_added: "2.10"
-short_description: Manage pfSense Certificate
+short_description: Manage ckSense Certificate
 description:
   >
-    Manage pfSense Certificate
+    Manage ckSense Certificate
 author: CK Lee (@cklee288)
 notes:
 options:
@@ -35,13 +34,13 @@ options:
     description:
       >
         The certificate for the Certificate.  This can be in PEM form or Base64
-        encoded PEM as a single string (which is how pfSense stores it).
+        encoded PEM as a single string (which is how ckSense stores it).
     type: str
   prv:
     description:
       >
         The private key for the Certificate.  This can be in PEM
-        form or Base64 encoded PEM as a single string (which is how pfSense stores it).
+        form or Base64 encoded PEM as a single string (which is how ckSense stores it).
     type: str
 """
 
