@@ -58,6 +58,7 @@ class PFSenseModule(object):
         self.dnshapers = self.get_element('dnshaper')
         self.vlans = self.get_element('vlans')
         self.gateways = self.get_element('gateways')
+        self.installedpackages = self.get_element('installedpackages')
         self.ipsec = self.get_element('ipsec')
         self.openvpn = self.get_element('openvpn')
         self.virtualip = None
@@ -474,6 +475,14 @@ class PFSenseModule(object):
 
             return gw_grp_elt
 
+        return None
+
+    def find_frr_elt(self):
+        """ return frr elt if found """
+        for frr_elt in self.installedpackages:
+            if frr_elt.tag != 'frr':
+                continue
+            return frr_elt
         return None
 
     def find_certobj_elt(self, descr, objtype, search_field='descr'):
