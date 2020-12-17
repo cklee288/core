@@ -53,6 +53,10 @@ options:
     choices: [ "on", "" ]
     default: "" 
     type: str
+  maintainasis:
+    description: copy existing parameter of frr global
+    choices: [ "yes", "no" ]
+    type: str
   routevalue1-20:
     description: route ip network (network/bit mask).
     required: false
@@ -79,6 +83,14 @@ EXAMPLES = """
     logging: off
     routevalue1: "10.0.1.0/24"
     routetarget1: if|opt3
+
+- name: on frr maintain as is
+  pfsensible.core.frr:
+    enable: on
+    password: myansiblepass
+    maintainasis: yes
+  become: yes
+
 
 - name: disable frr 
   pfsensible.core.frr:

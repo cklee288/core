@@ -16,6 +16,7 @@ FRR_ARGUMENT_SPEC = dict(
     logging=dict(default='', required=False, choices=['on', '']),
     ignoreipsecrestart=dict(default='', required=False, choices=['on', '']),
     routerid=dict(required=False, type='str'),
+    maintainasis=dict(required=False, choices=['yes', 'no']),
     routevalue1=dict(required=False, type='str'),
     routetarget1=dict(required=False, type='str'),
     routevalue2=dict(required=False, type='str'),
@@ -163,29 +164,43 @@ class PFSenseFrrModule(PFSenseModuleBase):
         obj = dict()
         # obj['name'] = params['name']
         if params['state'] == 'present':
-            # self._get_interface(params['interface'], obj)
-            self._get_ansible_param(obj, 'enable')
-            self._get_ansible_param(obj, 'password')
-            self._get_ansible_param(obj, 'carpstatusvid')
-            self._get_ansible_param(obj, 'logging')
-            self._get_ansible_param(obj, 'routerid')
-            self._get_ansible_param(obj, 'ignoreipsecrestart')
-            list = []
-            subobj = dict()
-            
-            # routevalue and its routetarget#
-            for i in range (1, 21): 
+            if params.get('maintainasis') is not None and params['maintainasis'] == 'yes':
+                dup_elt = self._duplicate_target()
+                mainobj = self.pfsense.element_to_dict(dup_elt)
+                obj = mainobj['config']
+                # update password and enable
+                self._get_ansible_param(obj, 'password')
+                self._get_ansible_param(obj, 'enable')
+                #copy back
+                mainobj['config'] = obj
+                return mainobj
+            else:
+                self._get_ansible_param(obj, 'enable')
+                self._get_ansible_param(obj, 'password')
+                self._get_ansible_param(obj, 'carpstatusvid')
+                self._get_ansible_param(obj, 'logging')
+                self._get_ansible_param(obj, 'routerid')
+                self._get_ansible_param(obj, 'ignoreipsecrestart')
+                list = []
+                subobj = dict()
+                
+                # routevalue and its routetarget#
+                for i in range (1, 21): 
 
-                if params.get('routevalue{}'.format(i)) is not None and (params['routevalue{}'.format(i)] != ''):
-                    subobj['routevalue'] = params['routevalue{}'.format(i)]
-                    rtitem = params['routetarget{}'.format(i)]
-                    fields = rtitem.split('|')
-                    # fields = rtitem.text.split('|')
-                    interfacename = self._return_interface(fields[1])
-                    subobj['routetarget'] = fields[0] + '|' + interfacename
-                    list.append(dict(subobj))
-            obj['row'] = list
-            mainobj['config'] = obj
+                    if params.get('routevalue{}'.format(i)) is not None and (params['routevalue{}'.format(i)] != ''):
+                        subobj['routevalue'] = params['routevalue{}'.format(i)]
+                        rtitem = params['routetarget{}'.format(i)]
+                        fields = rtitem.split('|')
+                        # fields = rtitem.text.split('|')
+                        if fields and fields[0] == "gw":
+                            subobj['routetarget'] = fields[0] + '|' + fields[1]
+                            list.append(dict(subobj))
+                        elif fields and fields[0] == "if":
+                            interfacename = self._return_interface(fields[1])
+                            subobj['routetarget'] = fields[0] + '|' + interfacename
+                            list.append(dict(subobj))
+                obj['row'] = list
+                mainobj['config'] = obj
 
         else:
             obj['enable'] = ''
@@ -243,6 +258,10 @@ class PFSenseFrrModule(PFSenseModuleBase):
 
     def _find_target(self):
         """ find the XML target_elt """
+        return self.pfsense.find_frr_elt()
+
+    def _duplicate_target(self):
+        """ duplicate the XML target_elt """
         return self.pfsense.find_frr_elt()
 
     def _get_interface(self, name, obj):
@@ -310,33 +329,24 @@ if ($retval == 0) clear_subsystem_dirty('staticroutes');
         """ generate pseudo-CLI command fields parameters to create an obj """
         values = ''
         if before is None:
-            # values += self.format_cli_field(self.params, 'interface')
-            # values += self.format_cli_field(self.obj, 'ipprotocol', default='inet')
-            # values += self.format_cli_field(self.obj, 'gateway')
-            # values += self.format_cli_field(self.obj, 'descr', default='')
-            # values += self.format_cli_field(self.params, 'disabled', fvalue=self.fvalue_bool, default=False)
-            # values += self.format_cli_field(self.obj, 'monitor')
-            # values += self.format_cli_field(self.params, 'monitor_disable', fvalue=self.fvalue_bool, default=False)
-            # values += self.format_cli_field(self.params, 'action_disable', fvalue=self.fvalue_bool, default=False)
-            # values += self.format_cli_field(self.params, 'force_down', fvalue=self.fvalue_bool, default=False)
-            # values += self.format_cli_field(self.obj, 'weight', default='1')
-            # values += self.format_cli_field(self.params, 'nonlocalgateway', fvalue=self.fvalue_bool, default=False)
-            values = 'test frr create'
+            values += self.format_cli_field(self.obj, 'enable', default='')
+            values += self.format_cli_field(self.obj, 'carpstatusvid', default='none')
+            values += self.format_cli_field(self.obj, 'logging', default='')
+            values += self.format_cli_field(self.obj, 'ignoreipsecrestart', default='')
+            values += self.format_cli_field(self.obj, 'routerid', default='')
+            for i in range (1, 21): 
+                if self.params.get('routevalue{}'.format(i)) is not None and (self.params['routevalue{}'.format(i)] != ''):
+                    values += self.format_cli_field(self.obj, 'routevalue{}'.format(i))
+                    values += self.format_cli_field(self.obj, 'routetarget{}'.format(i))
 
         else:
-            # fbefore = dict()
-            # fbefore['interface'] = self.pfsense.get_interface_display_name(before['interface'])
-
-            # values += self.format_updated_cli_field(self.params, fbefore, 'interface', add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'ipprotocol', default='inet', add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'gateway', add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'descr', default='', add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'disabled', fvalue=self.fvalue_bool, default=False, add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'monitor', add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'monitor_disable', fvalue=self.fvalue_bool, default=False, add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'action_disable', fvalue=self.fvalue_bool, default=False, add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'force_down', fvalue=self.fvalue_bool, default=False, add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'weight', default='1', add_comma=(values))
-            # values += self.format_updated_cli_field(self.obj, before, 'nonlocalgateway', fvalue=self.fvalue_bool)
-              values = 'test frr replace'
+            values += self.format_updated_cli_field(self.obj, before, 'enable', default='', add_comma=(values))
+            values += self.format_updated_cli_field(self.obj, before, 'carpstatusvid', default='none', add_comma=(values))
+            values += self.format_updated_cli_field(self.obj, before, 'logging', default='', add_comma=(values))
+            values += self.format_updated_cli_field(self.obj, before, 'ignoreipsecrestart', default='', add_comma=(values))
+            values += self.format_updated_cli_field(self.obj, before, 'routerid', default='', add_comma=(values))
+            for i in range (1, 21): 
+                if self.params.get('routevalue{}'.format(i)) is not None and (self.params['routevalue{}'.format(i)] != ''):
+                    values += self.format_updated_cli_field(self.obj, before, 'routevalue{}'.format(i), add_comma=(values))
+                    values += self.format_updated_cli_field(self.obj, before, 'routetarget{}'.format(i), add_comma=(values))
         return values
