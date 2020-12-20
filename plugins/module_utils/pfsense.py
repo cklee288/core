@@ -477,6 +477,33 @@ class PFSenseModule(object):
 
         return None
 
+    def find_gateway_group_without_gw_check_elt(self, name):
+        """ return gateway_group elt if found """
+        for gw_grp_elt in self.gateways:
+            if gw_grp_elt.tag != 'gateway_group':
+                continue
+            if gw_grp_elt.find('name').text != name:
+                continue
+
+            # check if protocol match
+            # match_protocol = True
+            # for gw_elt in gw_grp_elt:
+            #     if gw_elt.tag != 'item' or gw_elt.text is None:
+            #         continue
+
+            #     items = gw_elt.text.split('|')
+            #     if not items or self.find_gateway_elt(items[0], None, protocol) is None:
+            #         match_protocol = False
+            #         break
+
+            # if not match_protocol:
+            #     continue
+
+            return gw_grp_elt
+
+        return None
+
+
     def find_frr_elt(self):
         """ return frr elt if found """
         for frr_elt in self.installedpackages:

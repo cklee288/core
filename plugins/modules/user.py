@@ -178,11 +178,11 @@ class pfSenseUser(object):
             return priv
 
     def _validate_password(self, user):
-        # if re.match(r'\$2b\$', user['password']):
+        if re.match(r'\$2b\$', user['password']) or re.match(r'\$2y\$', user['password']):
             user['bcrypt-hash'] = user['password']
-        # else:
-        #    self.module.fail_json(msg='Password (%s) does not appear to be a bcrypt hash' % user['password'])
-        # del user['password']
+        else:
+           self.module.fail_json(msg='Password (%s) does not appear to be a bcrypt hash' % user['password'])
+        del user['password']
 
 
     def add(self, user):

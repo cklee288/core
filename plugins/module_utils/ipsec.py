@@ -155,7 +155,13 @@ class PFSenseIpsecModule(PFSenseModuleBase):
         ipsec['descr'] = params['descr']
 
         if params['state'] == 'present':
-            ipsec['interface'] = self.pfsense.parse_interface(params['interface'], with_virtual=False)
+            ipsec['interface'] = self.pfsense.parse_interface(params['interface'], fail=False, with_virtual=False)
+            if ipsec['interface'] is None:
+                if (self.pfsense.find_gateway_group_without_gw_check_elt(params['interface']) is None):
+                    self.module.fail_json(msg='%s is not a valid interface or gateway group' % (params['interface']))
+                else:
+                    ipsec['interface'] = params['interface']
+
             ipsec['iketype'] = params['iketype']
 
             if params.get('mode') is not None:
