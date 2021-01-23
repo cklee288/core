@@ -3,8 +3,12 @@
 # Copyright: (c) 2018, Frederic Bor <frederic.bor@wanadoo.fr>
 # GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+
 from __future__ import absolute_import, division, print_function
 __metaclass__ = type
+
+import re
+
 from ansible_collections.pfsensible.core.plugins.module_utils.module_base import PFSenseModuleBase
 from ansible.module_utils.compat.ipaddress import ip_address, ip_network
 
@@ -22,10 +26,13 @@ GATEWAY_ARGUMENT_SPEC = dict(
     force_down=dict(default=False, type='bool'),
     weight=dict(default=1, required=False, type='int'),
     nonlocalgateway=dict(default=False, type='bool'),
+    ipsecvtigateway=dict(default=False, type='bool'),
+    # ikeid=dict(required=False, type='int'), ( can be confirmed from interface name)
 )
 
 GATEWAY_REQUIRED_IF = [
     ["state", "present", ["interface", "gateway", "weight"]],
+    # ["ipsecvtigateway", True, ["ikeid"]],
 ]
 
 
@@ -96,6 +103,13 @@ class PFSenseGatewayModule(PFSenseModuleBase):
                     return True
             return False
 
+        if self.params['ipsecvtigateway']:
+            interface_name_elt = self.interface_elt.find('if')
+            if re.match('ipsec[0-9]', interface_name_elt.text):
+                ikeid = int(interface_name_elt.text[5])
+                #### to be continue to get the phase2 ikeid for its ip address and subnet
+            return
+
         if self.params['ipprotocol'] == 'inet':
             inet_type = 'IPv4'
             f1_elt = self.interface_elt.find('ipaddr')
@@ -140,6 +154,7 @@ class PFSenseGatewayModule(PFSenseModuleBase):
             self._get_ansible_param_bool(obj, 'action_disable', value=None)
             self._get_ansible_param_bool(obj, 'force_down', value=None)
             self._get_ansible_param_bool(obj, 'nonlocalgateway', value=None)
+            self._get_ansible_param_bool(obj, 'ipsecvtigateway', value=None)
 
             if not self.dynamic:
                 self._check_subnet()
@@ -203,7 +218,7 @@ class PFSenseGatewayModule(PFSenseModuleBase):
     @staticmethod
     def _get_params_to_remove():
         """ returns the list of params to remove if they are not set """
-        return ['disabled', 'monitor', 'monitor_disable', 'action_disable', 'force_down', 'nonlocalgateway']
+        return ['disabled', 'monitor', 'monitor_disable', 'action_disable', 'force_down', 'nonlocalgateway', 'ipsecvtigateway']
 
     ##############################
     # run
@@ -247,6 +262,8 @@ if ($retval == 0) clear_subsystem_dirty('staticroutes');
             values += self.format_cli_field(self.params, 'force_down', fvalue=self.fvalue_bool, default=False)
             values += self.format_cli_field(self.obj, 'weight', default='1')
             values += self.format_cli_field(self.params, 'nonlocalgateway', fvalue=self.fvalue_bool, default=False)
+            values += self.format_cli_field(self.params, 'ipsecvtigateway', fvalue=self.fvalue_bool, default=False)
+            # values += self.format_cli_field(self.params, 'ikeid')
         else:
             fbefore = dict()
             fbefore['interface'] = self.pfsense.get_interface_display_name(before['interface'])
@@ -262,5 +279,7 @@ if ($retval == 0) clear_subsystem_dirty('staticroutes');
             values += self.format_updated_cli_field(self.obj, before, 'force_down', fvalue=self.fvalue_bool, default=False, add_comma=(values))
             values += self.format_updated_cli_field(self.obj, before, 'weight', default='1', add_comma=(values))
             values += self.format_updated_cli_field(self.obj, before, 'nonlocalgateway', fvalue=self.fvalue_bool)
+            values += self.format_updated_cli_field(self.obj, before, 'ipsecvtigateway', fvalue=self.fvalue_bool, default=False, add_comma=(values))
+            # values += self.format_updated_cli_field(self.obj, before, 'ikeid', add_comma=(values))
 
         return values

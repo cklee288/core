@@ -74,6 +74,13 @@ options:
       - This is usually indicative of a configuration error, but is required for some scenarios.
     default: false
     type: bool
+  ipsecvtigateway:
+    description:
+      - This will allow check of gateway IP through ikeid provided on ipsec phase 2.
+      - This is needed for ipsec vti gateway setup
+    default: false
+    type: bool
+    (not required because vtigateway created automatically)
   state:
     description: State in which to leave the gateway
     choices: [ "present", "absent" ]
@@ -86,6 +93,16 @@ EXAMPLES = """
   pfsensible.core.gateway:
     name: default_gw
     interface: wan
+    gateway: 1.2.3.4
+    state: present
+
+## not required, ipsecvti gateway automatically created 
+# when interface defined
+- name: Add ipsecvti gateway
+  pfsensible.core.gateway:
+    name: ipsecvti_gw
+    interface: ipsecvti_if
+    ipsecvtigateway: True
     gateway: 1.2.3.4
     state: present
 
@@ -102,6 +119,7 @@ commands:
     type: list
     sample: ["create gateway 'default_gw', interface='wan', address='1.2.3.4'", "delete gateway 'vpn_gw'"]
 """
+
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.pfsensible.core.plugins.module_utils.gateway import PFSenseGatewayModule, GATEWAY_ARGUMENT_SPEC, GATEWAY_REQUIRED_IF
