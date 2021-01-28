@@ -231,6 +231,8 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
                 i = len(self.root_elt)
                 self.root_elt.insert(i , interface_elt)
                 return interface_elt
+            else:
+                return self.pfsense.get_interface_elt(interface)
 
         # wan can't be deleted, so the first interface we can create is lan
         if self.pfsense.get_interface_elt('lan') is None:
@@ -267,11 +269,24 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
                 return iface
         return None
 
+    def _get_interface_elt_by_port_and_interface_tag(self, interface_port, interface_number):
+        """ return pfsense interface_elt """
+        for iface in self.root_elt:
+            iface_tag = '{0}'.format(iface.tag)
+            interface = 'opt{0}'.format(interface_number)
+            if iface_tag is None:
+                continue
+            if iface.find('if').text.strip() == interface_port and interface == iface_tag:
+                return iface
+        return None
+
+
     def _get_interface_elt_by_iface_tag(self, interface_number):
         """ return pfsense interface_elt """
         for iface in self.root_elt:
-            iface_tag = iface.tag
-            interface = "'opt{0}'".format(interface_number) 
+            iface_tag = '{0}'.format(iface.tag)
+            interface = 'opt{0}'.format(interface_number)
+            # interface = "'opt{0}'".format(interface_number) 
             if iface_tag is None:
                 continue
             if interface == iface_tag:
@@ -328,6 +343,11 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
 
     def _return_interface(self):
         """ return target interface """
+
+        # we first try to find an interface having same port and display name
+        interface_elt = self._get_interface_elt_by_port_and_interface_tag(self.obj['if'], self.params['interfacenumber'])
+        if interface_elt is not None:
+            return interface_elt
 
         # we try to find an existing interface used or not.
         used_by = self._get_interface_display_name_by_port(self.obj['if'])
