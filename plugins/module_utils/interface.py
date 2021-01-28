@@ -29,6 +29,9 @@ INTERFACE_ARGUMENT_SPEC = dict(
     ipv6_gateway=dict(required=False, type='str'),
     blockpriv=dict(required=False, type='bool'),
     blockbogons=dict(required=False, type='bool'),
+    interfacenumber=dict(required=False, type='int'),
+    interfacenumber_start=dict(default=1, required=False, type='int'),
+    interfacenumber_end=dict(default=1000, required=False, type='int'),
 )
 
 INTERFACE_REQUIRED_IF = [
@@ -120,7 +123,13 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
                 self._get_ansible_param(obj, 'ipv6_gateway', fname='gatewayv6')
 
             # get target interface
-            self.target_elt = self._find_matching_interface()
+            # defined by CK Lee 28Jan2021
+            if self.params.get('interfacenumber') is not None and not(self.params['interfacenumber'] < 1 or self.params['interfacenumber'] > 10000):
+                self.target_elt = self._return_interface()
+            else:
+                ## below is original setup
+                self.target_elt = self._find_matching_interface()
+    
             self._check_overlaps('ipaddrv6', 'subnetv6')
             self._check_overlaps('ipaddr', 'subnet')
 
@@ -176,9 +185,15 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
                 if params.get('ipv4_address') and not self.pfsense.is_ipv4_address(params['ipv4_address']):
                     self.module.fail_json(msg='{0} is not a valid IPv4 address'.format(params['ipv4_address']))
 
-            if params['ipv6_type'] == 'static':
-                if params.get('ipv6_address') and not self.pfsense.is_ipv6_address(params['ipv6_address']):
-                    self.module.fail_json(msg='{0} is not a valid IPv6 address'.format(params['ipv6_address']))
+            if params.get('interfacenumber') is not None and (params['interfacenumber'] < 1 or params['interfacenumber'] > 10000):
+                self.module.fail_json(msg='interfacenumber must be between 1 and 10000')
+
+            if params.get('interfacenumber_start') is not None and (params['interfacenumber_start'] < 1 or params['interfacenumber_start'] > 9999) and (params['interfacenumber_start'] < params['interfacenumber_end']):
+                self.module.fail_json(msg='interfacenumber_start must be between 1 and 9999, also less than interfacenumber_end' )
+
+            if params.get('interfacenumber_end') is not None and (params['interfacenumber_end'] < 2 or params['interfacenumber_start'] > 10000) and (params['interfacenumber_start'] < params['interfacenumber_end']):
+                self.module.fail_json(msg='interfacenumber_end must be between 2 and 10000, also more than interfacenumber_start')
+
 
     ##############################
     # XML processing
@@ -206,22 +221,41 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
 
     def _create_target(self):
         """ create the XML target_elt """
+  
+        # created by CK Lee 28Jan2021
+        if self.params.get('interfacenumber') is not None and not(self.params["interfacenumber"] < 1 or self.params["interfacenumber"] > 10000):
+            interface_number = self.params["interfacenumber"]
+            interface = 'opt{0}'.format(interface_number)
+            if self.pfsense.get_interface_elt(interface) is None:
+                interface_elt = self.pfsense.new_element(interface)
+                i = len(self.root_elt)
+                self.root_elt.insert(i , interface_elt)
+                return interface_elt
+
         # wan can't be deleted, so the first interface we can create is lan
         if self.pfsense.get_interface_elt('lan') is None:
             interface_elt = self.pfsense.new_element('lan')
             self.root_elt.insert(1, interface_elt)
             return interface_elt
 
+
+
         # lan is used, so we must create an optX interface
-        i = 1
-        while True:
-            interface = 'opt{0}'.format(i)
+        # i = 1
+        # replaced by CK Lee 28Jan2021
+        j = self.params["interfacenumber_start"]
+        # replaced by CK Lee 28Jan2021
+        # while True:
+        while ( j < self.params["interfacenumber_end"]):
+            interface = 'opt{0}'.format(j)
             if self.pfsense.get_interface_elt(interface) is None:
                 interface_elt = self.pfsense.new_element(interface)
-                # i + 1 = i + (lan and wan) - 1
-                self.root_elt.insert(i + 1, interface_elt)
+                i = len(self.root_elt)
+                self.root_elt.insert(i , interface_elt)
                 return interface_elt
-            i = i + 1
+            j = j + 1
+
+        self.module.fail_json(msg='all opt1-10000 interface full' )
 
     def _get_interface_elt_by_port_and_display_name(self, interface_port, name):
         """ return pfsense interface_elt """
@@ -230,6 +264,17 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
             if descr_elt is None:
                 continue
             if iface.find('if').text.strip() == interface_port and descr_elt.text.strip().lower() == name.lower():
+                return iface
+        return None
+
+    def _get_interface_elt_by_iface_tag(self, interface_number):
+        """ return pfsense interface_elt """
+        for iface in self.root_elt:
+            iface_tag = iface.tag
+            interface = "'opt{0}'".format(interface_number) 
+            if iface_tag is None:
+                continue
+            if interface == iface_tag:
                 return iface
         return None
 
@@ -280,6 +325,17 @@ class PFSenseInterfaceModule(PFSenseModuleBase):
 
         # last, we  try to find an existing interface with the port (interface will be renamed)
         return self._get_interface_elt_by_port(self.obj['if'])
+
+    def _return_interface(self):
+        """ return target interface """
+
+        # we try to find an existing interface used or not.
+        used_by = self._get_interface_display_name_by_port(self.obj['if'])
+        if used_by is not None:
+            self.module.fail_json(msg='Port {0} is already in use on interface {1}'.format(self.obj['if'], used_by))
+
+        # if interface not used, we will return the interface element
+        return self._get_interface_elt_by_iface_tag(self.params['interfacenumber'])
 
     def _find_target(self):
         """ find the XML target_elt """

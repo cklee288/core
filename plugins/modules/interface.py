@@ -97,6 +97,18 @@ options:
     description: Blocks traffic from reserved IP addresses (but not RFC 1918) or not yet assigned by IANA.
     required: false
     type: bool
+  interfacenumber:
+    description: interface number in opt format, either interfacenumber or interfacenumber_range, not both
+    required: false
+    type: int
+  interfacenumber_start:
+    description: interface number start in opt format, either interfacenumber or interfacenumber_start, not both
+    required: false
+    type: int
+  interfacenumber_end:
+    description: interface number end in opt format, either interfacenumber or interfacenumber_end, not both
+    required: false
+    type: int
 """
 
 EXAMPLES = """
@@ -104,6 +116,29 @@ EXAMPLES = """
   pfsensible.core.interface:
     descr: voice
     interface: mvneta0.100
+    enable: True
+
+- name: Add/update specific interface opt number
+  pfsensible.core.interface:
+    descr: voice
+    interface: mvneta0.100
+    interfacenumber: 100
+    enable: True
+
+- name: update specific interface opt number with interface maintain
+  pfsensible.core.interface:
+    ipv4_address: 10.5.0.1
+    ipv4_prefixlen: 24
+    ipv4_gateway: 10.5.0.254
+    interfacenumber: 100
+    enable: True
+
+- name: Add interface within range opt number
+  pfsensible.core.interface:
+    descr: voice
+    interface: mvneta0.100
+    interfacenumber_start: 100
+    interfacenumber_end: 100
     enable: True
 
 - name: Remove interface
